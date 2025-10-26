@@ -205,3 +205,37 @@ class SudokuRuleGraph:
         }
 
         return summary
+
+    def _get_valid_values(self, grid: np.ndarray, row: int, col: int) -> List[int]:
+        """
+        Get valid values for a cell (values that don't violate rules).
+
+        Args:
+            grid: Current grid state
+            row: Row index
+            col: Column index
+
+        Returns:
+            List of valid values (1-9)
+        """
+        valid = []
+
+        for value in range(1, 10):
+            # Try placing value
+            test_grid = grid.copy()
+            test_grid[row, col] = value
+
+            # Check if it creates violations
+            violations = self.verify(test_grid)
+
+            # Check if any violation involves this cell
+            creates_violation = False
+            for v in violations:
+                if (row, col) in v.cells:
+                    creates_violation = True
+                    break
+
+            if not creates_violation:
+                valid.append(value)
+
+        return valid

@@ -41,7 +41,7 @@ class ActionBasedSolver:
         self.path_memory = path_memory
         self.epsilon = epsilon
 
-    def solve(self, grid, original_clues=None, max_iterations=16, verbose=False):
+    def solve(self, grid, original_clues=None, max_iterations=81, verbose=False):
         """
         Solve by iteratively applying actions.
 
@@ -57,33 +57,42 @@ class ActionBasedSolver:
 
         for step in range(max_iterations):
             violations = self.rule_graph.verify(current_grid)
+            empty_cells = np.argwhere(current_grid == 0)
 
-            if len(violations) == 0:
+            if len(violations) == 0 and len(empty_cells) == 0:
                 if verbose:
                     print(f"✓ Solved in {step} steps!")
                 return current_grid, trace, True
 
-            # Get candidate cells (violated non-clues)
-            candidate_cells = self._get_candidate_cells(
-                violations,
-                original_clues
-            )
+            # Get candidate cells (violated non-clues and empty cells)
+            candidate_cells = self._get_candidate_cells(violations, original_clues)
+            for r, c in empty_cells:
+                if (r, c) not in candidate_cells:
+                    candidate_cells.append((r,c))
 
             if len(candidate_cells) == 0:
                 if verbose:
                     print("No editable cells available")
                 break
 
-            # Select and apply action
-            cell_idx, new_value = self.network.select_action(
+            cell_idx = self.network.select_cell(
                 current_grid,
                 violations,
                 candidate_cells,
                 epsilon=self.epsilon
             )
-
-            # Convert cell_idx to (row, col)
             row, col = cell_idx // 9, cell_idx % 9
+
+            # Get valid values for the selected cell
+            valid_values = self.rule_graph._get_valid_values(current_grid, row, col)
+
+            # Select a value to place in the cell
+            new_value = self.network.select_value(
+                current_grid,
+                valid_values,
+                epsilon=self.epsilon
+            )
+
             old_value = current_grid[row, col]
 
             # Apply action

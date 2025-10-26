@@ -127,7 +127,7 @@ class ActionBasedTrainer:
             # Apply action
             new_grid = current_grid.copy()
             row, col = cell_idx.item() // 9, cell_idx.item() % 9
-            new_grid[row, col] = value.item()
+            new_grid[row, col] = value.item() + 1
 
             # Compute reward
             new_violations = self.rule_graph.verify(new_grid)

@@ -41,9 +41,8 @@ def main():
 
     # Configuration
     NUM_TASKS = 10000
-    NUM_EPOCHS = 20
-    BATCH_SIZE = 1
-    LEARNING_RATE = 1e-4
+    NUM_EPOCHS = 10
+    LEARNING_RATE = 1e-5
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     print(f"Configuration:")

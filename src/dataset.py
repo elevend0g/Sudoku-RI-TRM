@@ -110,7 +110,7 @@ class RuleBasedSudokuDataset:
 
         for row, col in cells_to_fill:
             # Get valid values for this cell
-            valid_values = self._get_valid_values(grid, row, col)
+            valid_values = self.rule_graph._get_valid_values(grid, row, col)
 
             if len(valid_values) > 0:
                 # Choose random valid value
@@ -158,39 +158,7 @@ class RuleBasedSudokuDataset:
 
         return grid, original_clues
 
-    def _get_valid_values(self, grid: np.ndarray, row: int, col: int) -> List[int]:
-        """
-        Get valid values for a cell (values that don't violate rules).
 
-        Args:
-            grid: Current grid state
-            row: Row index
-            col: Column index
-
-        Returns:
-            List of valid values (1-9)
-        """
-        valid = []
-
-        for value in range(1, 10):
-            # Try placing value
-            test_grid = grid.copy()
-            test_grid[row, col] = value
-
-            # Check if it creates violations
-            violations = self.rule_graph.verify(test_grid)
-
-            # Check if any violation involves this cell
-            creates_violation = False
-            for v in violations:
-                if (row, col) in v.cells:
-                    creates_violation = True
-                    break
-
-            if not creates_violation:
-                valid.append(value)
-
-        return valid
 
     def _random_cell_order(self) -> List[tuple]:
         """

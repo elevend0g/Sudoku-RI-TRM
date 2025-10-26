@@ -3,6 +3,7 @@ Action-based network that outputs discrete actions.
 Forces exactly one cell to change per refinement step.
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
 from src.network import TinyRecursiveNetwork
@@ -36,7 +37,7 @@ class ActionBasedNetwork(nn.Module):
         self.value_selector = nn.Sequential(
             nn.Linear(hidden_size, hidden_size // 2),
             nn.ReLU(),
-            nn.Linear(hidden_size // 2, 10)  # What value (0-9)
+            nn.Linear(hidden_size // 2, 9)  # What value (1-9)
         )
 
     def forward(self, grid, violations=None, candidate_mask=None):
@@ -50,6 +51,9 @@ class ActionBasedNetwork(nn.Module):
             cell_probs: [batch, 81] probability distribution over cells
             value_probs: [batch, 10] probability distribution over values
         """
+        if isinstance(grid, np.ndarray):
+            grid = torch.from_numpy(grid.flatten()).long().unsqueeze(0)
+
         batch_size = grid.shape[0]
 
         # Process through transformer
@@ -74,9 +78,9 @@ class ActionBasedNetwork(nn.Module):
 
         return cell_probs, value_probs, confidence
 
-    def select_action(self, grid, violations, candidate_cells, epsilon=0.0):
+    def select_cell(self, grid, violations, candidate_cells, epsilon=0.0):
         """
-        Select an action using epsilon-greedy.
+        Select a cell to modify using epsilon-greedy.
 
         Args:
             grid: [batch, 81] or numpy [9, 9]
@@ -86,9 +90,7 @@ class ActionBasedNetwork(nn.Module):
 
         Returns:
             cell_idx: int (0-80)
-            new_value: int (0-9)
         """
-        import numpy as np
 
         # Convert grid to tensor if needed
         if isinstance(grid, np.ndarray):
@@ -108,19 +110,59 @@ class ActionBasedNetwork(nn.Module):
         if torch.rand(1).item() < epsilon:
             # Random exploration
             cell_idx = np.random.choice(candidate_indices)
-            new_value = np.random.randint(1, 10) # Values 1-9
         else:
             # Network action
             with torch.no_grad():
-                cell_probs, value_probs, _ = self.forward(
+                cell_probs, _, _ = self.forward(
                     grid, None, candidate_mask
                 )
 
             cell_idx = torch.argmax(cell_probs, dim=-1).item()
-            new_value = torch.argmax(value_probs, dim=-1).item()
 
-        return cell_idx, new_value
+        return cell_idx
 
+    def select_value(self, grid, valid_values, epsilon=0.0):
+        """
+        Select a value to place in the cell using epsilon-greedy.
+
+        Args:
+            grid: [batch, 81] or numpy [9, 9]
+            valid_values: List[int] - valid values for the selected cell
+            epsilon: exploration rate
+
+        Returns:
+            new_value: int (1-9)
+        """
+
+        # Epsilon-greedy
+        if torch.rand(1).item() < epsilon:
+            # Random exploration
+            if len(valid_values) > 0:
+                new_value = np.random.choice(valid_values)
+            else:
+                new_value = np.random.randint(1, 10) # Values 1-9
+        else:
+            # Network action
+            with torch.no_grad():
+                _, value_probs, _ = self.forward(grid, None, None)
+            
+            # Create value mask
+            value_mask = torch.zeros_like(value_probs)
+            for v in valid_values:
+                value_mask[:, v-1] = 1
+            
+            masked_value_probs = value_probs * value_mask
+
+            if masked_value_probs.sum() == 0:
+                # If there are no valid values, select a random value
+                if len(valid_values) > 0:
+                    new_value = np.random.choice(valid_values)
+                else:
+                    new_value = np.random.randint(1, 10)
+            else:
+                new_value = torch.argmax(masked_value_probs, dim=-1).item() + 1
+
+        return new_value
 
 def create_action_network(hidden_size=512, num_heads=8, num_layers=2):
     """Create action-based network for Sudoku."""
